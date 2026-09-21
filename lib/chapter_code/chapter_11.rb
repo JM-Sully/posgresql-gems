@@ -28,3 +28,6 @@ Copied migration 20260921063504_add_missing_taggable_index.acts_as_taggable_on_e
 Copied migration 20260921063505_change_collation_for_tag_names.acts_as_taggable_on_engine.rb from acts_as_taggable_on_engine
 Copied migration 20260921063506_add_missing_indexes_on_taggings.acts_as_taggable_on_engine.rb from acts_as_taggable_on_engine
 Copied migration 20260921063507_add_tenant_to_taggings.acts_as_taggable_on_engine.rb from acts_as_taggable_on_engine
+
+# apply the migrations copied from the gem
+bin/rails db:migrate
