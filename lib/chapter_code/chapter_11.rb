@@ -92,7 +92,21 @@ Foreign-key constraints:
  updated_at     | timestamp(6) without time zone |           | not null | 
  taggings_count | integer                        |           |          | 0
 Indexes:
-    "tags_pkey" PRIMARY KEY, btree (id)
-    "index_tags_on_name" UNIQUE, btree (name)
+  "tags_pkey" PRIMARY KEY, btree (id)
+  "index_tags_on_name" UNIQUE, btree (name)
 Referenced by:
-    TABLE "taggings" CONSTRAINT "fk_rails_9fcd2e236b" FOREIGN KEY (tag_id) REFERENCES tags(id)
+  TABLE "taggings" CONSTRAINT "fk_rails_9fcd2e236b" FOREIGN KEY (tag_id) REFERENCES tags(id)
+
+# generate a model to use with the tagging gem
+bin/rails generate resource User name:string
+invoke  active_record
+The name 'User' is either already used in your application or reserved by Ruby on Rails. 
+Please choose an alternative or use --skip-collision-check or --force to skip this check 
+and run this generator again.
+
+# run the migrations, this step isn't in the
+bin/rails db:migrate
+== 20260922074535 CreateUsers: migrating ======================================
+-- create_table(:users)
+   -> 0.0285s
+== 20260922074535 CreateUsers: migrated (0.0286s) =============================
