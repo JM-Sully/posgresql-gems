@@ -1,6 +1,16 @@
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
+# Append to the inherited excludes rather than replacing them
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  Exclude:
+    # Book notes: shell/psql transcripts kept as .rb for syntax highlighting
+    - "lib/chapter_code/**/*"
+
 # Overwrite or add rules to create your own house style
 #
 # # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
