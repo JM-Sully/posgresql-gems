@@ -49,6 +49,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_22_074535) do
     t.string "name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_users_on_created_at"
   end
 
   add_foreign_key "taggings", "tags"

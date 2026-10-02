@@ -290,3 +290,316 @@ D, [2026-09-23T09:18:08.317972 #93504] DEBUG -- :   ActsAsTaggableOn::Tag Load (
 ActsAsTaggableOn::Tagging.all
 D, [2026-09-23T09:18:24.803851 #93504] DEBUG -- :   ActsAsTaggableOn::Tagging Load (3.6ms)  SELECT "taggings".* FROM "taggings" /* loading for pp */ LIMIT 11 /*application='PosgresqlGems'*/
 => [#<ActsAsTaggableOn::Tagging:0x000000012410c460 id: 1, tag_id: 1, taggable_type: "User", taggable_id: 1, tagger_type: nil, tagger_id: nil, context: "tags", created_at: "2026-09-23 08:12:20.136699000 +0000", tenant: nil>]
+
+
+
+# new day from the limit and offset section
+# start a rails console
+bin/rails c
+
+# create 1000 users with unique names
+1000.times do |i|
+  User.create(name: "User #{i}")
+end
+
+# no need to turn on logging locally....
+User.second
+  User Load (2.9ms)  SELECT "users".* FROM "users" ORDER BY "users"."id" ASC LIMIT 1 OFFSET 1 /*application='PosgresqlGems'*/
+=> #<User:0x000000010d93ce58 id: 2, name: "User 0", created_at: "2026-09-25 08:11:30.558851000 +0000", updated_at: "2026-09-25 08:11:30.558851000 +0000", tag_list: nil>
+
+User.last
+User Load (1.9ms)  SELECT "users".* FROM "users" ORDER BY "users"."id" DESC LIMIT 1 /*application='PosgresqlGems'*/
+=> #<User:0x000000010d93ca98 id: 1001, name: "User 999", created_at: "2026-09-25 08:11:32.583646000 +0000", updated_at: "2026-09-25 08:11:32.583646000 +0000", tag_list: nil>
+
+# use limit and offset to get the first ten users, but skip the first one
+users = User.all.limit(10).offset(1)
+=> 
+[#<User:0x00000001234d6060 id: 2, name: "User 0", created_at: "2026-09-25 08:11:30.558851000 +0000", updated_at: "2026-09-25 08:11:30.558851000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5f20 id: 3, name: "User 1", created_at: "2026-09-25 08:11:30.611929000 +0000", updated_at: "2026-09-25 08:11:30.611929000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5de0 id: 4, name: "User 2", created_at: "2026-09-25 08:11:30.614063000 +0000", updated_at: "2026-09-25 08:11:30.614063000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5ca0 id: 5, name: "User 3", created_at: "2026-09-25 08:11:30.616005000 +0000", updated_at: "2026-09-25 08:11:30.616005000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5b60 id: 6, name: "User 4", created_at: "2026-09-25 08:11:30.617736000 +0000", updated_at: "2026-09-25 08:11:30.617736000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5a20 id: 7, name: "User 5", created_at: "2026-09-25 08:11:30.620530000 +0000", updated_at: "2026-09-25 08:11:30.620530000 +0000", tag_list: nil>,
+ #<User:0x00000001234d58e0 id: 8, name: "User 6", created_at: "2026-09-25 08:11:30.622799000 +0000", updated_at: "2026-09-25 08:11:30.622799000 +0000", tag_list: nil>,
+ #<User:0x00000001234d57a0 id: 9, name: "User 7", created_at: "2026-09-25 08:11:30.627000000 +0000", updated_at: "2026-09-25 08:11:30.627000000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5660 id: 10, name: "User 8", created_at: "2026-09-25 08:11:30.628925000 +0000", updated_at: "2026-09-25 08:11:30.628925000 +0000", tag_list: nil>,
+ #<User:0x00000001234d5520 id: 11, name: "User 9", created_at: "2026-09-25 08:11:30.631023000 +0000", updated_at: "2026-09-25 08:11:30.631023000 +0000", tag_list: nil>
+]
+
+# create a bunch of users so I can experiment with adding an index
+100000.times do |i|
+  User.create(name: "User #{999+i}")
+end
+
+User.all.count
+=> 101001
+  User Count (21.9ms)  SELECT COUNT(*) FROM "users" /*application='PosgresqlGems'*/
+=> 101001
+
+# use limit and offset to get the first ten users, but skip the 10,000
+users = User.all.limit(10).offset(10000)
+SELECT "users".* FROM "users" /* loading for pp */ LIMIT 10 OFFSET 10000 /*application='PosgresqlGems'*/
+=> 
+[#<User:0x00000001260bb7c0 id: 10001, name: "User 9998", created_at: "2026-09-28 08:07:04.157390000 +0000", updated_at: "2026-09-28 08:07:04.157390000 +0000", tag_list: nil>,
+
+# start a psql session
+bin/rails dbconsole
+
+EXPLAIN ANALYZE
+SELECT * FROM users
+ORDER BY created_at
+LIMIT 10 OFFSET 10000;
+
+QUERY PLAN                                                        
+--------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=9093.10..9093.13 rows=10 width=34) (actual time=24.534..24.538 rows=10 loops=1)
+   ->  Sort  (cost=9068.10..9320.61 rows=101001 width=34) (actual time=23.982..24.343 rows=10010 loops=1)
+         Sort Key: created_at
+         Sort Method: top-N heapsort  Memory: 1472kB
+         ->  Seq Scan on users  (cost=0.00..1852.01 rows=101001 width=34) (actual time=0.006..11.116 rows=101001 loops=1)
+ Planning Time: 0.323 ms
+ Execution Time: 25.563 ms
+(7 rows)
+
+
+# add an index on the created_at column
+CREATE INDEX index_users_on_created_at ON users (created_at);
+CREATE INDEX
+
+# see if the query plan has changed
+EXPLAIN ANALYZE
+SELECT * FROM users
+ORDER BY created_at
+LIMIT 10 OFFSET 10000;
+
+QUERY PLAN  
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=344.05..344.40 rows=10 width=34) (actual time=2.136..2.139 rows=10 loops=1)
+   ->  Index Scan using index_users_on_created_at on users
+          (cost=0.29..3472.31 rows=101001 width=34) (actual time=0.027..1.788 rows=10010 loops=1)
+ Planning Time: 0.451 ms
+ Execution Time: 2.500 ms
+(4 rows)
+
+# new day from database CURSOR pagination p253
+# start a psql session
+bin/rails dbconsole
+
+BEGIN;
+DECLARE users_cursor CURSOR FOR SELECT * FROM users ORDER BY id ASC;
+FETCH FORWARD 10 FROM users_cursor;
+FETCH FORWARD 10 FROM users_cursor;
+COMMIT;
+
+
+
+BEGIN;
+BEGIN
+DECLARE users_cursor CURSOR FOR SELECT * FROM users ORDER BY id ASC;
+DECLARE CURSOR
+FETCH FORWARD 10 FROM users_cursor;
+id |  name  |         created_at         |         updated_at         
+----+--------+----------------------------+----------------------------
+  1 | Jess   | 2026-09-22 08:10:16.301921 | 2026-09-22 08:10:16.301921
+  2 | User 0 | 2026-09-25 08:11:30.558851 | 2026-09-25 08:11:30.558851
+  3 | User 1 | 2026-09-25 08:11:30.611929 | 2026-09-25 08:11:30.611929
+  4 | User 2 | 2026-09-25 08:11:30.614063 | 2026-09-25 08:11:30.614063
+  5 | User 3 | 2026-09-25 08:11:30.616005 | 2026-09-25 08:11:30.616005
+  6 | User 4 | 2026-09-25 08:11:30.617736 | 2026-09-25 08:11:30.617736
+  7 | User 5 | 2026-09-25 08:11:30.62053  | 2026-09-25 08:11:30.62053
+  8 | User 6 | 2026-09-25 08:11:30.622799 | 2026-09-25 08:11:30.622799
+  9 | User 7 | 2026-09-25 08:11:30.627    | 2026-09-25 08:11:30.627
+ 10 | User 8 | 2026-09-25 08:11:30.628925 | 2026-09-25 08:11:30.628925
+(10 rows)
+FETCH FORWARD 10 FROM users_cursor;
+id |  name   |         created_at         |         updated_at         
+----+---------+----------------------------+----------------------------
+ 11 | User 9  | 2026-09-25 08:11:30.631023 | 2026-09-25 08:11:30.631023
+ 12 | User 10 | 2026-09-25 08:11:30.632615 | 2026-09-25 08:11:30.632615
+ 13 | User 11 | 2026-09-25 08:11:30.637698 | 2026-09-25 08:11:30.637698
+ 14 | User 12 | 2026-09-25 08:11:30.640227 | 2026-09-25 08:11:30.640227
+ 15 | User 13 | 2026-09-25 08:11:30.641617 | 2026-09-25 08:11:30.641617
+ 16 | User 14 | 2026-09-25 08:11:30.64331  | 2026-09-25 08:11:30.64331
+ 17 | User 15 | 2026-09-25 08:11:30.647993 | 2026-09-25 08:11:30.647993
+ 18 | User 16 | 2026-09-25 08:11:30.649739 | 2026-09-25 08:11:30.649739
+ 19 | User 17 | 2026-09-25 08:11:30.651426 | 2026-09-25 08:11:30.651426
+ 20 | User 18 | 2026-09-25 08:11:30.65364  | 2026-09-25 08:11:30.65364
+(10 rows)
+COMMIT;
+COMMIT
+
+# LIMIT and OFFSET
+BEGIN;
+SELECT * FROM users ORDER BY id LIMIT 10 OFFSET 0;   # snapshot A
+# someone else commits: INSERT a user, or DELETE user 15
+SELECT * FROM users ORDER BY id LIMIT 10 OFFSET 10;  # snapshot B, possibly different rows
+COMMIT;
+
+# CURSOR
+BEGIN;
+DECLARE users_cursor CURSOR FOR SELECT * FROM users ORDER BY id ASC;
+FETCH FORWARD 10 FROM users_cursor;  # rows 1–10, as of DECLARE
+# someone else commits an insert or delete
+FETCH FORWARD 10 FROM users_cursor;  # rows 11–20, still the DECLARE snapshot
+COMMIT;
+
+
+# new day from keyset pagination p254
+# start a psql session
+bin/rails dbconsole
+
+# confirm that the index scan is performed using the primary key index
+EXPLAIN SELECT * FROM users
+ORDER BY id ASC
+LIMIT 50;
+
+QUERY PLAN                                       
+---------------------------------------------------------------------------------------
+ Limit  (cost=0.29..2.01 rows=50 width=34)
+   ->  Index Scan using users_pkey on users  (cost=0.29..3472.31 rows=101001 width=34)
+(2 rows)
+
+# actually do the query (but with 10, so it's an easier screenshot)
+SELECT * FROM users
+ORDER BY id ASC
+LIMIT 10;
+id |  name  |         created_at         |         updated_at         
+----+--------+----------------------------+----------------------------
+  1 | Jess   | 2026-09-22 08:10:16.301921 | 2026-09-22 08:10:16.301921
+  2 | User 0 | 2026-09-25 08:11:30.558851 | 2026-09-25 08:11:30.558851
+  3 | User 1 | 2026-09-25 08:11:30.611929 | 2026-09-25 08:11:30.611929
+  4 | User 2 | 2026-09-25 08:11:30.614063 | 2026-09-25 08:11:30.614063
+  5 | User 3 | 2026-09-25 08:11:30.616005 | 2026-09-25 08:11:30.616005
+  6 | User 4 | 2026-09-25 08:11:30.617736 | 2026-09-25 08:11:30.617736
+  7 | User 5 | 2026-09-25 08:11:30.62053  | 2026-09-25 08:11:30.62053
+  8 | User 6 | 2026-09-25 08:11:30.622799 | 2026-09-25 08:11:30.622799
+  9 | User 7 | 2026-09-25 08:11:30.627    | 2026-09-25 08:11:30.627
+ 10 | User 8 | 2026-09-25 08:11:30.628925 | 2026-09-25 08:11:30.628925
+(10 rows)
+
+# If there was no record with id 5, this would return 9 results.
+SELECT * FROM users
+WHERE id BETWEEN 1 AND 10
+ORDER BY id;
+
+# use keyset to get the next 10 users
+SELECT * FROM users
+WHERE id > 10
+ORDER BY id ASC
+LIMIT 10;
+id |  name   |         created_at         |         updated_at         
+----+---------+----------------------------+----------------------------
+ 11 | User 9  | 2026-09-25 08:11:30.631023 | 2026-09-25 08:11:30.631023
+ 12 | User 10 | 2026-09-25 08:11:30.632615 | 2026-09-25 08:11:30.632615
+ 13 | User 11 | 2026-09-25 08:11:30.637698 | 2026-09-25 08:11:30.637698
+ 14 | User 12 | 2026-09-25 08:11:30.640227 | 2026-09-25 08:11:30.640227
+ 15 | User 13 | 2026-09-25 08:11:30.641617 | 2026-09-25 08:11:30.641617
+ 16 | User 14 | 2026-09-25 08:11:30.64331  | 2026-09-25 08:11:30.64331
+ 17 | User 15 | 2026-09-25 08:11:30.647993 | 2026-09-25 08:11:30.647993
+ 18 | User 16 | 2026-09-25 08:11:30.649739 | 2026-09-25 08:11:30.649739
+ 19 | User 17 | 2026-09-25 08:11:30.651426 | 2026-09-25 08:11:30.651426
+ 20 | User 18 | 2026-09-25 08:11:30.65364  | 2026-09-25 08:11:30.65364
+(10 rows)
+
+# But what if I deleted row 21
+DELETE FROM users WHERE id = 21;
+DELETE 1
+
+# Then the next 10 users would be:
+SELECT * FROM users
+WHERE id > 20
+ORDER BY id ASC
+LIMIT 10;
+id |  name   |         created_at         |         updated_at         
+----+---------+----------------------------+----------------------------
+ 22 | User 20 | 2026-09-25 08:11:30.660862 | 2026-09-25 08:11:30.660862
+ 23 | User 21 | 2026-09-25 08:11:30.662687 | 2026-09-25 08:11:30.662687
+ 24 | User 22 | 2026-09-25 08:11:30.664869 | 2026-09-25 08:11:30.664869
+ 25 | User 23 | 2026-09-25 08:11:30.667432 | 2026-09-25 08:11:30.667432
+ 26 | User 24 | 2026-09-25 08:11:30.669597 | 2026-09-25 08:11:30.669597
+ 27 | User 25 | 2026-09-25 08:11:30.671592 | 2026-09-25 08:11:30.671592
+ 28 | User 26 | 2026-09-25 08:11:30.673332 | 2026-09-25 08:11:30.673332
+ 29 | User 27 | 2026-09-25 08:11:30.675933 | 2026-09-25 08:11:30.675933
+ 30 | User 28 | 2026-09-25 08:11:30.677716 | 2026-09-25 08:11:30.677716
+ 31 | User 29 | 2026-09-25 08:11:30.679155 | 2026-09-25 08:11:30.679155
+(10 rows)
+
+# And the next 10 users
+SELECT * FROM users
+WHERE id > 30
+ORDER BY id ASC
+LIMIT 10;
+id |  name   |         created_at         |         updated_at         
+----+---------+----------------------------+----------------------------
+ 31 | User 29 | 2026-09-25 08:11:30.679155 | 2026-09-25 08:11:30.679155
+ 32 | User 30 | 2026-09-25 08:11:30.680941 | 2026-09-25 08:11:30.680941
+ 33 | User 31 | 2026-09-25 08:11:30.682712 | 2026-09-25 08:11:30.682712
+ 34 | User 32 | 2026-09-25 08:11:30.686674 | 2026-09-25 08:11:30.686674
+ 35 | User 33 | 2026-09-25 08:11:30.688638 | 2026-09-25 08:11:30.688638
+ 36 | User 34 | 2026-09-25 08:11:30.68988  | 2026-09-25 08:11:30.68988
+ 37 | User 35 | 2026-09-25 08:11:30.691619 | 2026-09-25 08:11:30.691619
+ 38 | User 36 | 2026-09-25 08:11:30.693114 | 2026-09-25 08:11:30.693114
+ 39 | User 37 | 2026-09-25 08:11:30.696525 | 2026-09-25 08:11:30.696525
+ 40 | User 38 | 2026-09-25 08:11:30.698458 | 2026-09-25 08:11:30.698458
+(10 rows)
+
+# create ten million users so I can do a comparison between techniques
+now = Time.current
+batch_size = 5_000
+0.step(9_999_999, batch_size) do |start|
+  rows = (start...(start + batch_size)).map do |i|
+    { name: "User #{101001 + i}", created_at: now, updated_at: now }
+  end
+  User.insert_all(rows)
+end
+
+User.last
+User Load (43.9ms)  SELECT "users".* FROM "users" ORDER BY "users"."id" DESC LIMIT 1 /*application='PosgresqlGems'*/
+=> 
+#<User:0x0000000121168ad8
+ id: 10101001,
+ name: "User 10101000",
+ created_at: "2026-09-30 07:35:09.257952000 +0000",
+ updated_at: "2026-09-30 07:35:09.257952000 +0000",
+ tag_list: nil>
+
+# back in psql
+# Run vacuum and analyze
+VACUUM (ANALYZE, VERBOSE) users, tags, taggings;
+
+# view the query for LIMIT and OFFSET
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM users
+ORDER BY id ASC
+LIMIT 10
+OFFSET 5000000;
+
+QUERY PLAN                                                                  
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=171510.68..171511.02 rows=10 width=36) (actual time=938.156..938.157 rows=10 loops=1)
+   Buffers: shared hit=1 read=55330 written=6158
+   ->  Index Scan using users_pkey on users  (cost=0.43..346485.43 rows=10101000 width=36) (actual time=0.677..831.059 rows=5000010 loops=1)
+         Buffers: shared hit=1 read=55330 written=6158
+ Planning:
+   Buffers: shared hit=16 dirtied=4
+ Planning Time: 0.246 ms
+ Execution Time: 940.437 ms
+(8 rows)
+
+# view the query for keyset pagination
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM users
+WHERE id > 5000000
+ORDER BY id ASC
+LIMIT 10;
+
+QUERY PLAN                                                              
+-------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..0.80 rows=10 width=36) (actual time=0.246..0.249 rows=10 loops=1)
+   Buffers: shared hit=2 read=2
+   ->  Index Scan using users_pkey on users  (cost=0.43..186256.04 rows=5060892 width=36) (actual time=0.245..0.247 rows=10 loops=1)
+         Index Cond: (id > 5000000)
+         Buffers: shared hit=2 read=2
+ Planning Time: 0.101 ms
+ Execution Time: 0.337 ms
+(7 rows)
+
+
